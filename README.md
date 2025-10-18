@@ -25,7 +25,7 @@ s3_uploader/
 │   └── upload_manager.py     # 上传任务管理器
 └── gui/                       # 图形界面模块
     ├── __init__.py
-    ├── theme.py              # 猫娘主题配置
+    ├── theme.py              # 主题配置
     ├── widgets.py            # 自定义UI组件
     └── main_window.py        # 主窗口界面
 ```
