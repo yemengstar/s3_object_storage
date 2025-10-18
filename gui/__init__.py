@@ -11,7 +11,8 @@ from gui.widgets import (
     NekoButton,
     NekoListbox,
     NekoText,
-    NekoCheckButton
+    NekoCheckButton,
+    NekoCombobox
 )
 from gui.main_window import S3UploaderApp
 
@@ -24,5 +25,6 @@ __all__ = [
     'NekoListbox',
     'NekoText',
     'NekoCheckButton',
+    'NekoCombobox',
     'S3UploaderApp'
 ]

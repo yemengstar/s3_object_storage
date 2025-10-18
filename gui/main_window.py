@@ -1,18 +1,13 @@
-"""
-主窗口界面
-猫娘主题的S3上传工具GUI
-"""
-
 import time
 from tkinter import (
-    Frame, Label, Button, filedialog, messagebox, END
+    Frame, Label, Button, filedialog, messagebox, END, Canvas, VERTICAL, RIGHT, Y, BOTH
 )
 from tkinter import ttk
 
 from gui.theme import NekoTheme
 from gui.widgets import (
     NekoFrame, NekoLabel, NekoEntry, NekoButton,
-    NekoListbox, NekoText, NekoCheckButton
+    NekoListbox, NekoText, NekoCheckButton, NekoCombobox
 )
 from core.s3_client import S3ClientWrapper
 from core.upload_manager import UploadManager
@@ -41,7 +36,10 @@ class S3UploaderApp:
         self.root.configure(bg=NekoTheme.BG_MAIN)
         
         # 设置最小窗口大小
-        self.root.minsize(900, 700)
+        self.root.minsize(900, 600)
+        
+        # 存储桶列表缓存
+        self.bucket_list = []
         
         # 设置窗口图标（如果需要）
         try:
@@ -56,6 +54,10 @@ class S3UploaderApp:
     
     def _create_ui(self):
         """创建用户界面"""
+        # 创建主滚动容器
+        self._create_scrollable_container()
+        
+        # 在滚动容器内创建内容
         # 顶部标题栏
         self._create_header()
         
@@ -67,10 +69,105 @@ class S3UploaderApp:
         
         # 底部状态栏
         self._create_status_section()
+        
+        # 配置滚动区域
+        self.content_frame.update_idletasks()
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+    
+    def _create_scrollable_container(self):
+        """创建可滚动容器"""
+        # 创建Canvas
+        self.canvas = Canvas(self.root, bg=NekoTheme.BG_MAIN, highlightthickness=0)
+        self.canvas.pack(side='left', fill='both', expand=True)
+        
+        # 创建美化的滚动条
+        scrollbar_frame = NekoFrame(self.root, bg=NekoTheme.BG_DARK)
+        scrollbar_frame.pack(side=RIGHT, fill=Y)
+        
+        # 配置ttk滚动条样式
+        style = ttk.Style()
+        style.theme_use('clam')
+        
+        # 自定义滚动条样式
+        style.configure(
+            'Neko.Vertical.TScrollbar',
+            background=NekoTheme.PRIMARY_LIGHT,
+            troughcolor=NekoTheme.BG_DARK,
+            bordercolor=NekoTheme.BG_DARK,
+            arrowcolor=NekoTheme.PRIMARY_DARK,
+            relief='flat',
+            borderwidth=0,
+            width=14
+        )
+        
+        # 配置滚动条不同状态的颜色
+        style.map(
+            'Neko.Vertical.TScrollbar',
+            background=[
+                ('pressed', NekoTheme.PRIMARY_DARK),
+                ('active', NekoTheme.PRIMARY),
+                ('!active', NekoTheme.PRIMARY_LIGHT)
+            ],
+            arrowcolor=[
+                ('pressed', NekoTheme.BG_SECONDARY),
+                ('active', NekoTheme.BG_SECONDARY),
+                ('!active', NekoTheme.PRIMARY_DARK)
+            ]
+        )
+        
+        # 创建滚动条
+        self.scrollbar = ttk.Scrollbar(
+            scrollbar_frame,
+            orient=VERTICAL,
+            command=self.canvas.yview,
+            style='Neko.Vertical.TScrollbar'
+        )
+        self.scrollbar.pack(fill=Y, expand=True, padx=2, pady=2)
+        
+        # 配置Canvas
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        
+        # 创建内容框架
+        self.content_frame = NekoFrame(self.canvas)
+        self.canvas_window = self.canvas.create_window((0, 0), window=self.content_frame, anchor='nw')
+        
+        # 绑定事件
+        self.content_frame.bind('<Configure>', self._on_frame_configure)
+        self.canvas.bind('<Configure>', self._on_canvas_configure)
+        
+        # 绑定鼠标滚轮
+        self._bind_mousewheel()
+    
+    def _on_frame_configure(self, event=None):
+        """内容框架大小改变时更新滚动区域"""
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+    
+    def _on_canvas_configure(self, event):
+        """Canvas大小改变时调整内容框架宽度"""
+        canvas_width = event.width
+        self.canvas.itemconfig(self.canvas_window, width=canvas_width)
+    
+    def _bind_mousewheel(self):
+        """绑定鼠标滚轮事件"""
+        def _on_mousewheel(event):
+            # Windows和MacOS
+            if event.delta:
+                self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            # Linux
+            elif event.num == 4:
+                self.canvas.yview_scroll(-1, "units")
+            elif event.num == 5:
+                self.canvas.yview_scroll(1, "units")
+        
+        # Windows和MacOS
+        self.canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        # Linux
+        self.canvas.bind_all("<Button-4>", _on_mousewheel)
+        self.canvas.bind_all("<Button-5>", _on_mousewheel)
     
     def _create_header(self):
         """创建顶部标题栏"""
-        header = NekoFrame(self.root, bg=NekoTheme.PRIMARY_LIGHT)
+        header = NekoFrame(self.content_frame, bg=NekoTheme.PRIMARY_LIGHT)
         header.pack(fill='x', pady=(0, 10))
         
         title = NekoLabel(
@@ -91,7 +188,7 @@ class S3UploaderApp:
     
     def _create_config_section(self):
         """创建配置区域"""
-        config_frame = NekoFrame(self.root, relief='flat', bd=0)
+        config_frame = NekoFrame(self.content_frame, relief='flat', bd=0)
         config_frame.pack(fill='x', padx=20, pady=(0, 10))
         
         # 标题
@@ -99,16 +196,18 @@ class S3UploaderApp:
             row=0, column=0, columnspan=4, sticky='w', pady=(0, 8)
         )
         
-        # 第一行：端点和存储桶
+        # 第一行：端点和存储桶（下拉选择）
         NekoLabel(config_frame, text='端点 URL:').grid(row=1, column=0, sticky='w', pady=4)
         self.endpoint_entry = NekoEntry(config_frame, width=40)
         self.endpoint_entry.insert(0, 'https://s3.example.com')
         self.endpoint_entry.grid(row=1, column=1, padx=(5, 15), pady=4, sticky='ew')
         
         NekoLabel(config_frame, text='存储桶:').grid(row=1, column=2, sticky='w', pady=4)
-        self.bucket_entry = NekoEntry(config_frame, width=20)
-        self.bucket_entry.insert(0, 'my-bucket')
-        self.bucket_entry.grid(row=1, column=3, padx=5, pady=4, sticky='ew')
+        
+        # 存储桶下拉选择框
+        self.bucket_combobox = NekoCombobox(config_frame, width=18)
+        self.bucket_combobox.set('my-bucket')
+        self.bucket_combobox.grid(row=1, column=3, padx=5, pady=4, sticky='ew')
         
         # 第二行：公开URL和前缀
         NekoLabel(config_frame, text='公开 URL:').grid(row=2, column=0, sticky='w', pady=4)
@@ -148,7 +247,7 @@ class S3UploaderApp:
     
     def _create_main_section(self):
         """创建主要内容区域"""
-        main_frame = NekoFrame(self.root)
+        main_frame = NekoFrame(self.content_frame)
         main_frame.pack(fill='both', expand=True, padx=20, pady=(0, 10))
         
         # 左侧：文件列表
@@ -241,7 +340,7 @@ class S3UploaderApp:
     
     def _create_status_section(self):
         """创建底部状态区域"""
-        status_frame = NekoFrame(self.root)
+        status_frame = NekoFrame(self.content_frame)
         status_frame.pack(fill='both', expand=False, padx=20, pady=(0, 12))
         
         # 进度条
@@ -295,7 +394,7 @@ class S3UploaderApp:
         """移除选中的文件"""
         selection = self.file_listbox.curselection()
         if not selection:
-            messagebox.showwarning('提示', '请先选择要移除的文件 😿')
+            messagebox.showwarning('提示', '请先选择要移除的文件')
             return
         
         idx = selection[0]
@@ -309,7 +408,7 @@ class S3UploaderApp:
     def clear_files(self):
         """清空文件列表"""
         if self.upload_manager.tasks:
-            result = messagebox.askyesno('确认', '确定要清空所有文件吗？😺')
+            result = messagebox.askyesno('确认', '确定要清空所有文件吗？')
             if result:
                 self.upload_manager.clear_tasks()
                 self._update_file_list()
@@ -328,6 +427,23 @@ class S3UploaderApp:
             success, message = client.test_connection()
             
             if success:
+                # 获取存储桶列表
+                buckets = client.list_buckets()
+                self.bucket_list = buckets
+                
+                # 更新下拉列表
+                if buckets:
+                    self.bucket_combobox.configure(values=buckets)
+                    # 如果当前值不在列表中，设置为第一个
+                    current = self.bucket_combobox.get()
+                    if current not in buckets:
+                        self.bucket_combobox.set(buckets[0])
+                    
+                    bucket_info = f'\n可用存储桶: {", ".join(buckets[:5])}'
+                    if len(buckets) > 5:
+                        bucket_info += f'... (共{len(buckets)}个)'
+                    message += bucket_info
+                
                 messagebox.showinfo('连接成功', message)
                 self.log_message(f'✅ {message}')
             else:
@@ -340,7 +456,7 @@ class S3UploaderApp:
     def start_upload(self):
         """开始上传"""
         if not self.upload_manager.get_pending_tasks():
-            messagebox.showwarning('提示', '没有待上传的文件 😿')
+            messagebox.showwarning('提示', '没有待上传的文件')
             return
         
         try:
@@ -393,7 +509,7 @@ class S3UploaderApp:
         """所有任务完成"""
         self.progress_bar['value'] = 100
         self.log_message('🎉 所有上传任务已完成！')
-        messagebox.showinfo('完成', '所有文件上传完成！ ฅ(•ㅅ•❀)ฅ')
+        messagebox.showinfo('完成', '所有文件上传完成！ (∠・ω< )⌒☆')
     
     # ==================== 辅助方法 ====================
     
@@ -403,7 +519,7 @@ class S3UploaderApp:
         if not endpoint:
             raise ValueError('端点URL不能为空')
         
-        bucket = self.bucket_entry.get().strip()
+        bucket = self.bucket_combobox.get().strip()
         if not bucket:
             raise ValueError('存储桶名称不能为空')
         

@@ -1,5 +1,5 @@
 """
-自定义风格UI组件
+自定义猫娘风格UI组件
 基于Tkinter封装，应用NekoTheme主题
 """
 
@@ -7,12 +7,13 @@ from tkinter import (
     Frame, Label, Entry, Button, Listbox, 
     Scrollbar, Text, IntVar, VERTICAL, RIGHT, LEFT, Y, BOTH, END
 )
+from tkinter import ttk
 
 from gui.theme import NekoTheme
 
 
 class NekoFrame(Frame):
-    """风格框架"""
+    """猫娘风格框架"""
     
     def __init__(self, master, **kwargs):
         # 设置默认样式
@@ -112,17 +113,48 @@ class NekoListbox(Frame):
         self.listbox = Listbox(self, **theme_style, **kwargs)
         self.listbox.pack(side=LEFT, fill=BOTH, expand=True)
         
-        # 创建滚动条
-        scrollbar = Scrollbar(
-            self,
-            orient=VERTICAL,
-            command=self.listbox.yview,
-            bg=NekoTheme.BG_SECONDARY,
+        # 创建美化的滚动条容器
+        scrollbar_container = Frame(self, bg=NekoTheme.BG_DARK, width=16)
+        scrollbar_container.pack(side=RIGHT, fill=Y)
+        scrollbar_container.pack_propagate(False)
+        
+        # 配置ttk滚动条样式
+        style = ttk.Style()
+        style.theme_use('clam')
+        
+        style.configure(
+            'NekoList.Vertical.TScrollbar',
+            background=NekoTheme.PRIMARY_LIGHT,
             troughcolor=NekoTheme.BG_DARK,
-            activebackground=NekoTheme.PRIMARY_DARK,
+            bordercolor=NekoTheme.BG_DARK,
+            arrowcolor=NekoTheme.PRIMARY_DARK,
+            relief='flat',
+            borderwidth=0,
             width=12
         )
-        scrollbar.pack(side=RIGHT, fill=Y)
+        
+        style.map(
+            'NekoList.Vertical.TScrollbar',
+            background=[
+                ('pressed', NekoTheme.PRIMARY_DARK),
+                ('active', NekoTheme.PRIMARY),
+                ('!active', NekoTheme.PRIMARY_LIGHT)
+            ],
+            arrowcolor=[
+                ('pressed', NekoTheme.BG_SECONDARY),
+                ('active', NekoTheme.BG_SECONDARY),
+                ('!active', NekoTheme.PRIMARY_DARK)
+            ]
+        )
+        
+        # 创建滚动条
+        scrollbar = ttk.Scrollbar(
+            scrollbar_container,
+            orient=VERTICAL,
+            command=self.listbox.yview,
+            style='NekoList.Vertical.TScrollbar'
+        )
+        scrollbar.pack(fill=Y, expand=True, padx=2, pady=2)
         
         self.listbox.config(yscrollcommand=scrollbar.set)
     
@@ -283,3 +315,46 @@ class NekoCheckButton(Frame):
     def grid(self, **kwargs):
         """支持grid布局"""
         super().grid(**kwargs)
+
+
+class NekoCombobox(ttk.Combobox):
+    """猫娘风格下拉选择框"""
+    
+    def __init__(self, master, **kwargs):
+        # 应用主题样式
+        style = ttk.Style()
+        style.theme_use('clam')
+        
+        # 配置Combobox样式
+        style.configure(
+            'Neko.TCombobox',
+            fieldbackground=NekoTheme.BG_SECONDARY,
+            background=NekoTheme.BG_SECONDARY,
+            foreground=NekoTheme.TEXT_PRIMARY,
+            arrowcolor=NekoTheme.PRIMARY_DARK,
+            bordercolor=NekoTheme.BORDER,
+            lightcolor=NekoTheme.BG_SECONDARY,
+            darkcolor=NekoTheme.BG_SECONDARY,
+            selectbackground=NekoTheme.PRIMARY_LIGHT,
+            selectforeground=NekoTheme.TEXT_PRIMARY
+        )
+        
+        # 配置下拉列表样式
+        style.map(
+            'Neko.TCombobox',
+            fieldbackground=[('readonly', NekoTheme.BG_SECONDARY)],
+            selectbackground=[('readonly', NekoTheme.PRIMARY_LIGHT)],
+            selectforeground=[('readonly', NekoTheme.TEXT_PRIMARY)]
+        )
+        
+        # 设置字体
+        if 'font' not in kwargs:
+            kwargs['font'] = (NekoTheme.FONT_FAMILY, NekoTheme.FONT_SIZE_NORMAL)
+        
+        # 设置样式
+        kwargs['style'] = 'Neko.TCombobox'
+        
+        super().__init__(master, **kwargs)
+        
+        # 配置选项
+        self.configure(state='normal')  # 允许输入和选择
