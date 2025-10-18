@@ -1,5 +1,5 @@
 """
-自定义猫娘风格UI组件
+自定义风格UI组件
 基于Tkinter封装，应用NekoTheme主题
 """
 
@@ -12,7 +12,7 @@ from gui.theme import NekoTheme
 
 
 class NekoFrame(Frame):
-    """猫娘风格框架"""
+    """风格框架"""
     
     def __init__(self, master, **kwargs):
         # 设置默认样式

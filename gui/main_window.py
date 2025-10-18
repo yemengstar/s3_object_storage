@@ -36,9 +36,12 @@ class S3UploaderApp:
     
     def _setup_window(self):
         """设置窗口基本属性"""
-        self.root.title('🐱 喵喵云存储上传工具 - Neko S3 Uploader')
-        self.root.geometry('1000x720')
+        self.root.title('夜梦星尘上传工具 - YeMengStar S3 Uploader')
+        self.root.geometry('1100x800')
         self.root.configure(bg=NekoTheme.BG_MAIN)
+        
+        # 设置最小窗口大小
+        self.root.minsize(900, 700)
         
         # 设置窗口图标（如果需要）
         try:
@@ -68,15 +71,15 @@ class S3UploaderApp:
     def _create_header(self):
         """创建顶部标题栏"""
         header = NekoFrame(self.root, bg=NekoTheme.PRIMARY_LIGHT)
-        header.pack(fill='x', pady=(0, 15))
+        header.pack(fill='x', pady=(0, 10))
         
         title = NekoLabel(
             header,
-            text='🐱 喵喵云存储上传工具',
+            text='夜梦星尘上传工具',
             style='title',
             bg=NekoTheme.PRIMARY_LIGHT
         )
-        title.pack(pady=15)
+        title.pack(pady=12)
         
         subtitle = NekoLabel(
             header,
@@ -84,52 +87,52 @@ class S3UploaderApp:
             style='subtitle',
             bg=NekoTheme.PRIMARY_LIGHT
         )
-        subtitle.pack(pady=(0, 10))
+        subtitle.pack(pady=(0, 8))
     
     def _create_config_section(self):
         """创建配置区域"""
         config_frame = NekoFrame(self.root, relief='flat', bd=0)
-        config_frame.pack(fill='x', padx=20, pady=(0, 15))
+        config_frame.pack(fill='x', padx=20, pady=(0, 10))
         
         # 标题
         NekoLabel(config_frame, text='📡 连接配置', style='title').grid(
-            row=0, column=0, columnspan=4, sticky='w', pady=(0, 10)
+            row=0, column=0, columnspan=4, sticky='w', pady=(0, 8)
         )
         
         # 第一行：端点和存储桶
-        NekoLabel(config_frame, text='端点 URL:').grid(row=1, column=0, sticky='w', pady=5)
+        NekoLabel(config_frame, text='端点 URL:').grid(row=1, column=0, sticky='w', pady=4)
         self.endpoint_entry = NekoEntry(config_frame, width=40)
         self.endpoint_entry.insert(0, 'https://s3.example.com')
-        self.endpoint_entry.grid(row=1, column=1, padx=(5, 15), pady=5, sticky='ew')
+        self.endpoint_entry.grid(row=1, column=1, padx=(5, 15), pady=4, sticky='ew')
         
-        NekoLabel(config_frame, text='存储桶:').grid(row=1, column=2, sticky='w', pady=5)
+        NekoLabel(config_frame, text='存储桶:').grid(row=1, column=2, sticky='w', pady=4)
         self.bucket_entry = NekoEntry(config_frame, width=20)
         self.bucket_entry.insert(0, 'my-bucket')
-        self.bucket_entry.grid(row=1, column=3, padx=5, pady=5, sticky='ew')
+        self.bucket_entry.grid(row=1, column=3, padx=5, pady=4, sticky='ew')
         
         # 第二行：公开URL和前缀
-        NekoLabel(config_frame, text='公开 URL:').grid(row=2, column=0, sticky='w', pady=5)
+        NekoLabel(config_frame, text='公开 URL:').grid(row=2, column=0, sticky='w', pady=4)
         self.baseurl_entry = NekoEntry(config_frame, width=40)
         self.baseurl_entry.insert(0, 'https://cdn.example.com')
-        self.baseurl_entry.grid(row=2, column=1, padx=(5, 15), pady=5, sticky='ew')
+        self.baseurl_entry.grid(row=2, column=1, padx=(5, 15), pady=4, sticky='ew')
         
-        NekoLabel(config_frame, text='路径前缀:').grid(row=2, column=2, sticky='w', pady=5)
+        NekoLabel(config_frame, text='路径前缀:').grid(row=2, column=2, sticky='w', pady=4)
         self.prefix_entry = NekoEntry(config_frame, width=20)
-        self.prefix_entry.grid(row=2, column=3, padx=5, pady=5, sticky='ew')
+        self.prefix_entry.grid(row=2, column=3, padx=5, pady=4, sticky='ew')
         
         # 第三行：访问密钥
-        NekoLabel(config_frame, text='访问密钥:').grid(row=3, column=0, sticky='w', pady=5)
+        NekoLabel(config_frame, text='访问密钥:').grid(row=3, column=0, sticky='w', pady=4)
         self.access_entry = NekoEntry(config_frame, width=40)
-        self.access_entry.grid(row=3, column=1, padx=(5, 15), pady=5, sticky='ew')
+        self.access_entry.grid(row=3, column=1, padx=(5, 15), pady=4, sticky='ew')
         
-        NekoLabel(config_frame, text='私密密钥:').grid(row=3, column=2, sticky='w', pady=5)
+        NekoLabel(config_frame, text='私密密钥:').grid(row=3, column=2, sticky='w', pady=4)
         self.secret_entry = NekoEntry(config_frame, width=20, show='•')
-        self.secret_entry.grid(row=3, column=3, padx=5, pady=5, sticky='ew')
+        self.secret_entry.grid(row=3, column=3, padx=5, pady=4, sticky='ew')
         
         # 第四行：选项
         self.public_var = NekoCheckButton(config_frame, text='🌐 设置为公开可读 (ACL=public-read)')
         self.public_var.pack_var.set(1)
-        self.public_var.grid(row=4, column=0, columnspan=2, sticky='w', pady=10)
+        self.public_var.grid(row=4, column=0, columnspan=2, sticky='w', pady=8)
         
         # 测试连接按钮
         NekoButton(
@@ -137,7 +140,7 @@ class S3UploaderApp:
             text='🔌 测试连接',
             command=self.test_connection,
             style='secondary'
-        ).grid(row=4, column=2, columnspan=2, padx=5, pady=10, sticky='e')
+        ).grid(row=4, column=2, columnspan=2, padx=5, pady=8, sticky='e')
         
         # 配置grid权重
         config_frame.columnconfigure(1, weight=2)
@@ -146,35 +149,39 @@ class S3UploaderApp:
     def _create_main_section(self):
         """创建主要内容区域"""
         main_frame = NekoFrame(self.root)
-        main_frame.pack(fill='both', expand=True, padx=20, pady=(0, 15))
+        main_frame.pack(fill='both', expand=True, padx=20, pady=(0, 10))
         
         # 左侧：文件列表
         left_frame = NekoFrame(main_frame)
         left_frame.pack(side='left', fill='both', expand=True, padx=(0, 10))
         
-        NekoLabel(left_frame, text='📁 待上传文件列表', style='title').pack(anchor='w', pady=(0, 8))
+        NekoLabel(left_frame, text='📁 待上传文件列表', style='title').pack(anchor='w', pady=(0, 6))
         
-        # 文件列表框
-        self.file_listbox = NekoListbox(left_frame)
+        # 文件列表框 - 固定高度
+        list_container = NekoFrame(left_frame)
+        list_container.pack(fill='both', expand=True)
+        list_container.config(height=200)  # 限制高度
+        
+        self.file_listbox = NekoListbox(list_container)
         self.file_listbox.pack(fill='both', expand=True)
         
         # 文件操作按钮
         btn_frame = NekoFrame(left_frame)
-        btn_frame.pack(fill='x', pady=(8, 0))
+        btn_frame.pack(fill='x', pady=(6, 0))
         
         NekoButton(
             btn_frame,
             text='➕ 添加文件',
             command=self.add_files,
             style='secondary'
-        ).pack(side='left', padx=(0, 8))
+        ).pack(side='left', padx=(0, 6))
         
         NekoButton(
             btn_frame,
             text='➖ 移除选中',
             command=self.remove_selected,
             style='secondary'
-        ).pack(side='left', padx=(0, 8))
+        ).pack(side='left', padx=(0, 6))
         
         NekoButton(
             btn_frame,
@@ -183,12 +190,12 @@ class S3UploaderApp:
             style='secondary'
         ).pack(side='left')
         
-        # 右侧：控制面板
+        # 右侧：控制面板 - 紧凑设计
         right_frame = NekoFrame(main_frame, bg=NekoTheme.BG_SECONDARY)
         right_frame.pack(side='right', fill='y', padx=(10, 0))
         
         NekoLabel(right_frame, text='⚙️ 上传控制', style='title', bg=NekoTheme.BG_SECONDARY).pack(
-            anchor='w', pady=(10, 15), padx=15
+            anchor='w', pady=(8, 10), padx=12
         )
         
         # 上传按钮
@@ -197,30 +204,30 @@ class S3UploaderApp:
             text='🚀 开始上传',
             command=self.start_upload,
             style='primary'
-        ).pack(pady=8, padx=15, fill='x')
+        ).pack(pady=6, padx=12, fill='x')
         
         NekoButton(
             right_frame,
             text='⏸️ 停止上传',
             command=self.stop_upload,
             style='danger'
-        ).pack(pady=8, padx=15, fill='x')
+        ).pack(pady=6, padx=12, fill='x')
         
         # 线程设置
         thread_frame = NekoFrame(right_frame, bg=NekoTheme.BG_SECONDARY)
-        thread_frame.pack(fill='x', padx=15, pady=(15, 0))
+        thread_frame.pack(fill='x', padx=12, pady=(10, 0))
         
         NekoLabel(thread_frame, text='🔄 并发线程数:', bg=NekoTheme.BG_SECONDARY).pack(anchor='w')
         self.threads_entry = NekoEntry(thread_frame, width=10)
         self.threads_entry.insert(0, '3')
-        self.threads_entry.pack(fill='x', pady=(5, 0))
+        self.threads_entry.pack(fill='x', pady=(4, 0))
         
-        # 统计信息
+        # 统计信息 - 紧凑布局
         stats_frame = NekoFrame(right_frame, bg=NekoTheme.PRIMARY_LIGHT)
-        stats_frame.pack(fill='x', padx=15, pady=(20, 10))
+        stats_frame.pack(fill='x', padx=12, pady=(15, 8))
         
-        NekoLabel(stats_frame, text='📊 统计信息', style='title', bg=NekoTheme.PRIMARY_LIGHT).pack(
-            anchor='w', pady=8, padx=10
+        NekoLabel(stats_frame, text='📊 统计', style='title', bg=NekoTheme.PRIMARY_LIGHT).pack(
+            anchor='w', pady=6, padx=8
         )
         
         self.stats_label = NekoLabel(
@@ -230,15 +237,15 @@ class S3UploaderApp:
             bg=NekoTheme.PRIMARY_LIGHT,
             justify='left'
         )
-        self.stats_label.pack(anchor='w', padx=10, pady=(0, 10))
+        self.stats_label.pack(anchor='w', padx=8, pady=(0, 6))
     
     def _create_status_section(self):
         """创建底部状态区域"""
         status_frame = NekoFrame(self.root)
-        status_frame.pack(fill='both', expand=False, padx=20, pady=(0, 15))
+        status_frame.pack(fill='both', expand=False, padx=20, pady=(0, 12))
         
         # 进度条
-        NekoLabel(status_frame, text='📈 上传进度', style='title').pack(anchor='w', pady=(0, 8))
+        NekoLabel(status_frame, text='📈 上传进度', style='title').pack(anchor='w', pady=(0, 6))
         
         self.progress_bar = ttk.Progressbar(
             status_frame,
@@ -246,7 +253,7 @@ class S3UploaderApp:
             mode='determinate',
             maximum=100
         )
-        self.progress_bar.pack(fill='x', pady=(0, 10))
+        self.progress_bar.pack(fill='x', pady=(0, 8))
         
         # 配置进度条样式
         style = ttk.Style()
@@ -260,10 +267,10 @@ class S3UploaderApp:
             darkcolor=NekoTheme.PRIMARY_DARK
         )
         
-        # 日志区域
-        NekoLabel(status_frame, text='📝 运行日志', style='title').pack(anchor='w', pady=(0, 8))
+        # 日志区域 - 减小高度
+        NekoLabel(status_frame, text='📝 运行日志', style='title').pack(anchor='w', pady=(0, 6))
         
-        self.log_text = NekoText(status_frame, height=8)
+        self.log_text = NekoText(status_frame, height=6)
         self.log_text.pack(fill='both', expand=True)
     
     def _bind_callbacks(self):
