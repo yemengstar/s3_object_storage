@@ -1,9 +1,4 @@
-# S3 Uploader Requirements
-# Python 3.8+
-
-# AWS SDK for Python - S3操作核心
 boto3>=1.26.0
 botocore>=1.29.0
-
-# 剪贴板操作
+tkinterdnd2>=0.3.0
 pyperclip>=1.8.2

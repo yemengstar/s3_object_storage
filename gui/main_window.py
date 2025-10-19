@@ -1,16 +1,22 @@
 import time
 from tkinter import (
-    Frame, Label, Button, filedialog, messagebox, END, Canvas, VERTICAL, RIGHT, Y, BOTH
+    Frame, Label, Button, filedialog, END, Canvas, VERTICAL, RIGHT, Y, BOTH
 )
 from tkinter import ttk
+from tkinterdnd2 import DND_FILES, TkinterDnD
 
 from gui.theme import NekoTheme
 from gui.widgets import (
     NekoFrame, NekoLabel, NekoEntry, NekoButton,
     NekoListbox, NekoText, NekoCheckButton, NekoCombobox
 )
+from gui.custom_dialogs import (
+    show_input, show_message, show_question, show_warning,
+    show_error, show_success, show_confirm, ConfigDialog
+)
 from core.s3_client import S3ClientWrapper
 from core.upload_manager import UploadManager
+from core.config_manager import ConfigManager
 
 try:
     import pyperclip
@@ -26,8 +32,11 @@ class S3UploaderApp:
         self.root = root
         self._setup_window()
         self._init_manager()
+        self._init_config_manager()
         self._create_ui()
         self._bind_callbacks()
+        self._load_current_config()
+        self._setup_drag_drop()
     
     def _setup_window(self):
         """设置窗口基本属性"""
@@ -41,7 +50,7 @@ class S3UploaderApp:
         # 存储桶列表缓存
         self.bucket_list = []
         
-        # 设置窗口图标（如果需要）
+        # 设置窗口图标(如果需要)
         try:
             # self.root.iconbitmap('icon.ico')
             pass
@@ -52,6 +61,10 @@ class S3UploaderApp:
         """初始化上传管理器"""
         self.upload_manager = UploadManager()
     
+    def _init_config_manager(self):
+        """初始化配置管理器"""
+        self.config_manager = ConfigManager()
+    
     def _create_ui(self):
         """创建用户界面"""
         # 创建主滚动容器
@@ -61,7 +74,7 @@ class S3UploaderApp:
         # 顶部标题栏
         self._create_header()
         
-        # 配置区域
+        # 配置区域(包含配置管理)
         self._create_config_section()
         
         # 主要内容区域
@@ -191,47 +204,87 @@ class S3UploaderApp:
         config_frame = NekoFrame(self.content_frame, relief='flat', bd=0)
         config_frame.pack(fill='x', padx=20, pady=(0, 10))
         
-        # 标题
-        NekoLabel(config_frame, text='📡 连接配置', style='title').grid(
-            row=0, column=0, columnspan=4, sticky='w', pady=(0, 8)
-        )
+        # 标题和配置管理按钮
+        title_frame = NekoFrame(config_frame)
+        title_frame.grid(row=0, column=0, columnspan=4, sticky='ew', pady=(0, 8))
         
-        # 第一行：端点和存储桶（下拉选择）
-        NekoLabel(config_frame, text='端点 URL:').grid(row=1, column=0, sticky='w', pady=4)
+        NekoLabel(title_frame, text='📡 连接配置', style='title').pack(side='left')
+        
+        # 配置管理按钮组
+        btn_frame = NekoFrame(title_frame)
+        btn_frame.pack(side='right')
+        
+        NekoButton(
+            btn_frame,
+            text='💾 保存配置',
+            command=self.save_config,
+            style='secondary'
+        ).pack(side='left', padx=2)
+        
+        NekoButton(
+            btn_frame,
+            text='➕ 新建配置',
+            command=self.add_new_profile,
+            style='secondary'
+        ).pack(side='left', padx=2)
+        
+        NekoButton(
+            btn_frame,
+            text='⚙️ 管理配置',
+            command=self.manage_profiles,
+            style='secondary'
+        ).pack(side='left', padx=2)
+        
+        NekoButton(
+            btn_frame,
+            text='🗑️ 删除配置',
+            command=self.delete_profile,
+            style='secondary'
+        ).pack(side='left', padx=2)
+        
+        # 配置选择下拉框
+        profile_frame = NekoFrame(config_frame)
+        profile_frame.grid(row=1, column=0, columnspan=4, sticky='ew', pady=(0, 8))
+        
+        NekoLabel(profile_frame, text='当前配置:').pack(side='left', padx=(0, 8))
+        
+        self.profile_combobox = NekoCombobox(profile_frame, width=25)
+        self.profile_combobox.pack(side='left')
+        self.profile_combobox.bind('<<ComboboxSelected>>', self._on_profile_changed)
+        self._update_profile_list()
+        
+        # 第一行:端点和存储桶(下拉选择)
+        NekoLabel(config_frame, text='端点 URL:').grid(row=2, column=0, sticky='w', pady=4)
         self.endpoint_entry = NekoEntry(config_frame, width=40)
-        self.endpoint_entry.insert(0, 'https://s3.example.com')
-        self.endpoint_entry.grid(row=1, column=1, padx=(5, 15), pady=4, sticky='ew')
+        self.endpoint_entry.grid(row=2, column=1, padx=(5, 15), pady=4, sticky='ew')
         
-        NekoLabel(config_frame, text='存储桶:').grid(row=1, column=2, sticky='w', pady=4)
+        NekoLabel(config_frame, text='存储桶:').grid(row=2, column=2, sticky='w', pady=4)
         
         # 存储桶下拉选择框
         self.bucket_combobox = NekoCombobox(config_frame, width=18)
-        self.bucket_combobox.set('my-bucket')
-        self.bucket_combobox.grid(row=1, column=3, padx=5, pady=4, sticky='ew')
+        self.bucket_combobox.grid(row=2, column=3, padx=5, pady=4, sticky='ew')
         
-        # 第二行：公开URL和前缀
-        NekoLabel(config_frame, text='公开 URL:').grid(row=2, column=0, sticky='w', pady=4)
+        # 第二行:公开URL和前缀
+        NekoLabel(config_frame, text='公开 URL:').grid(row=3, column=0, sticky='w', pady=4)
         self.baseurl_entry = NekoEntry(config_frame, width=40)
-        self.baseurl_entry.insert(0, 'https://cdn.example.com')
-        self.baseurl_entry.grid(row=2, column=1, padx=(5, 15), pady=4, sticky='ew')
+        self.baseurl_entry.grid(row=3, column=1, padx=(5, 15), pady=4, sticky='ew')
         
-        NekoLabel(config_frame, text='路径前缀:').grid(row=2, column=2, sticky='w', pady=4)
+        NekoLabel(config_frame, text='路径前缀:').grid(row=3, column=2, sticky='w', pady=4)
         self.prefix_entry = NekoEntry(config_frame, width=20)
-        self.prefix_entry.grid(row=2, column=3, padx=5, pady=4, sticky='ew')
+        self.prefix_entry.grid(row=3, column=3, padx=5, pady=4, sticky='ew')
         
-        # 第三行：访问密钥
-        NekoLabel(config_frame, text='访问密钥:').grid(row=3, column=0, sticky='w', pady=4)
+        # 第三行:访问密钥
+        NekoLabel(config_frame, text='访问密钥:').grid(row=4, column=0, sticky='w', pady=4)
         self.access_entry = NekoEntry(config_frame, width=40)
-        self.access_entry.grid(row=3, column=1, padx=(5, 15), pady=4, sticky='ew')
+        self.access_entry.grid(row=4, column=1, padx=(5, 15), pady=4, sticky='ew')
         
-        NekoLabel(config_frame, text='私密密钥:').grid(row=3, column=2, sticky='w', pady=4)
+        NekoLabel(config_frame, text='秘密密钥:').grid(row=4, column=2, sticky='w', pady=4)
         self.secret_entry = NekoEntry(config_frame, width=20, show='•')
-        self.secret_entry.grid(row=3, column=3, padx=5, pady=4, sticky='ew')
+        self.secret_entry.grid(row=4, column=3, padx=5, pady=4, sticky='ew')
         
-        # 第四行：选项
+        # 第四行:选项
         self.public_var = NekoCheckButton(config_frame, text='🌐 设置为公开可读 (ACL=public-read)')
-        self.public_var.pack_var.set(1)
-        self.public_var.grid(row=4, column=0, columnspan=2, sticky='w', pady=8)
+        self.public_var.grid(row=5, column=0, columnspan=2, sticky='w', pady=8)
         
         # 测试连接按钮
         NekoButton(
@@ -239,7 +292,7 @@ class S3UploaderApp:
             text='🔌 测试连接',
             command=self.test_connection,
             style='secondary'
-        ).grid(row=4, column=2, columnspan=2, padx=5, pady=8, sticky='e')
+        ).grid(row=5, column=2, columnspan=2, padx=5, pady=8, sticky='e')
         
         # 配置grid权重
         config_frame.columnconfigure(1, weight=2)
@@ -250,11 +303,11 @@ class S3UploaderApp:
         main_frame = NekoFrame(self.content_frame)
         main_frame.pack(fill='both', expand=True, padx=20, pady=(0, 10))
         
-        # 左侧：文件列表
+        # 左侧:文件列表
         left_frame = NekoFrame(main_frame)
         left_frame.pack(side='left', fill='both', expand=True, padx=(0, 10))
         
-        NekoLabel(left_frame, text='📁 待上传文件列表', style='title').pack(anchor='w', pady=(0, 6))
+        NekoLabel(left_frame, text='📁 待上传文件列表 (支持拖拽文件到此)', style='title').pack(anchor='w', pady=(0, 6))
         
         # 文件列表框 - 固定高度
         list_container = NekoFrame(left_frame)
@@ -289,7 +342,7 @@ class S3UploaderApp:
             style='secondary'
         ).pack(side='left')
         
-        # 右侧：控制面板 - 紧凑设计
+        # 右侧:控制面板 - 紧凑设计
         right_frame = NekoFrame(main_frame, bg=NekoTheme.BG_SECONDARY)
         right_frame.pack(side='right', fill='y', padx=(10, 0))
         
@@ -318,7 +371,6 @@ class S3UploaderApp:
         
         NekoLabel(thread_frame, text='🔄 并发线程数:', bg=NekoTheme.BG_SECONDARY).pack(anchor='w')
         self.threads_entry = NekoEntry(thread_frame, width=10)
-        self.threads_entry.insert(0, '3')
         self.threads_entry.pack(fill='x', pady=(4, 0))
         
         # 统计信息 - 紧凑布局
@@ -379,6 +431,188 @@ class S3UploaderApp:
         self.upload_manager.on_task_error = self._on_task_error
         self.upload_manager.on_all_complete = self._on_all_complete
     
+    def _setup_drag_drop(self):
+        """设置拖拽功能"""
+        # 为文件列表框设置拖拽
+        self.file_listbox.listbox.drop_target_register(DND_FILES)
+        self.file_listbox.listbox.dnd_bind('<<Drop>>', self._on_drop)
+    
+    def _on_drop(self, event):
+        """处理文件拖拽"""
+        # 获取拖拽的文件路径
+        files = self.root.tk.splitlist(event.data)
+        if files:
+            count = self.upload_manager.add_files(list(files))
+            self._update_file_list()
+            self._update_stats()
+            self.log_message(f'✅ 通过拖拽添加了 {count} 个文件')
+    
+    # ==================== 配置管理 ====================
+    
+    def _update_profile_list(self):
+        """更新配置列表"""
+        profiles = self.config_manager.get_profile_names()
+        self.profile_combobox.configure(values=profiles)
+        self.profile_combobox.set(self.config_manager.current_profile)
+    
+    def _on_profile_changed(self, event=None):
+        """配置切换"""
+        selected = self.profile_combobox.get()
+        if selected and selected != self.config_manager.current_profile:
+            self.config_manager.switch_profile(selected)
+            self._load_current_config()
+            self.log_message(f'🔄 已切换到配置: {selected}')
+    
+    def _load_current_config(self):
+        """加载当前配置到界面"""
+        config = self.config_manager.get_current_config()
+        
+        self.endpoint_entry.delete(0, END)
+        self.endpoint_entry.insert(0, config.get('endpoint', ''))
+        
+        self.bucket_combobox.set(config.get('bucket', ''))
+        
+        self.baseurl_entry.delete(0, END)
+        self.baseurl_entry.insert(0, config.get('base_url', ''))
+        
+        self.prefix_entry.delete(0, END)
+        self.prefix_entry.insert(0, config.get('prefix', ''))
+        
+        self.access_entry.delete(0, END)
+        self.access_entry.insert(0, config.get('access_key', ''))
+        
+        self.secret_entry.delete(0, END)
+        self.secret_entry.insert(0, config.get('secret_key', ''))
+        
+        self.public_var.pack_var.set(1 if config.get('make_public', True) else 0)
+        
+        self.threads_entry.delete(0, END)
+        self.threads_entry.insert(0, str(config.get('max_threads', 3)))
+    
+    def save_config(self):
+        """保存当前配置"""
+        try:
+            config = self._get_s3_config()
+            config['max_threads'] = int(self.threads_entry.get())
+            self.config_manager.save_current_config(config)
+            show_success(
+                self.root,
+                '保存成功',
+                f'配置 "{self.config_manager.current_profile}" 已保存成功！✨'
+            )
+            self.log_message(f'💾 已保存配置: {self.config_manager.current_profile}')
+        except Exception as e:
+            show_error(self.root, '保存失败', f'保存配置时发生错误:\n{e}')
+            self.log_message(f'❌ 保存配置失败: {e}')
+    
+    def add_new_profile(self):
+        """添加新配置"""
+        profile_name = show_input(
+            self.root,
+            '新建配置',
+            '请输入新配置的名称:\n(例如: aws-prod, aliyun-dev, minio-local)',
+            icon='➕'
+        )
+        
+        if profile_name:
+            if self.config_manager.add_profile(profile_name):
+                self._update_profile_list()
+                self.config_manager.switch_profile(profile_name)
+                self.profile_combobox.set(profile_name)
+                self._load_current_config()
+                show_success(
+                    self.root,
+                    '创建成功',
+                    f'新配置 "{profile_name}" 已创建！🎉\n现在可以开始配置参数了~'
+                )
+                self.log_message(f'➕ 已创建新配置: {profile_name}')
+            else:
+                show_error(self.root, '创建失败', f'配置名称 "{profile_name}" 已存在，请使用其他名称')
+    
+    def delete_profile(self):
+        """删除配置"""
+        current = self.config_manager.current_profile
+        if current == 'default':
+            show_warning(
+                self.root,
+                '无法删除',
+                '默认配置是系统保留配置，不能删除哦 ฅ^•ﻌ•^ฅ'
+            )
+            return
+        
+        result = show_question(
+            self.root,
+            '确认删除',
+            f'确定要删除配置 "{current}" 吗？删除后将自动切换到默认配置，\n此操作不可撤销！'
+        )
+        
+        if result:
+            if self.config_manager.delete_profile(current):
+                self._update_profile_list()
+                self._load_current_config()
+                show_success(
+                    self.root,
+                    '删除成功',
+                    f'配置 "{current}" 已删除\n已切换到默认配置'
+                )
+                self.log_message(f'🗑️ 已删除配置: {current}')
+    
+    def manage_profiles(self):
+        """管理配置"""
+        dialog = ConfigDialog(
+            self.root,
+            '配置管理',
+            self.config_manager.get_profile_names()
+        )
+        result = dialog.wait_result()
+        
+        # 处理配置管理操作
+        if dialog.action == 'add':
+            self.add_new_profile()
+        elif dialog.action == 'rename':
+            self._rename_profile(dialog.selected_profile)
+        elif dialog.action == 'delete':
+            self._do_delete_profile(dialog.selected_profile)
+    
+    def _rename_profile(self, old_name):
+        """重命名配置"""
+        new_name = show_input(
+            self.root,
+            '重命名配置',
+            f'请输入新的配置名称:\n(原名称: {old_name})',
+            default=old_name,
+            icon='✏️'
+        )
+        
+        if new_name and new_name != old_name:
+            if self.config_manager.rename_profile(old_name, new_name):
+                self._update_profile_list()
+                show_success(
+                    self.root,
+                    '重命名成功',
+                    f'配置已从 "{old_name}" 重命名为 "{new_name}"'
+                )
+                self.log_message(f'✏️ 已重命名配置: {old_name} -> {new_name}')
+            else:
+                show_error(
+                    self.root,
+                    '重命名失败',
+                    f'配置名称 "{new_name}" 已存在或发生错误'
+                )
+    
+    def _do_delete_profile(self, profile_name):
+        """执行删除配置"""
+        if self.config_manager.delete_profile(profile_name):
+            self._update_profile_list()
+            if self.config_manager.current_profile != profile_name:
+                self._load_current_config()
+            show_success(
+                self.root,
+                '删除成功',
+                f'配置 "{profile_name}" 已删除'
+            )
+            self.log_message(f'🗑️ 已删除配置: {profile_name}')
+    
     # ==================== 事件处理 ====================
     
     def add_files(self):
@@ -394,7 +628,7 @@ class S3UploaderApp:
         """移除选中的文件"""
         selection = self.file_listbox.curselection()
         if not selection:
-            messagebox.showwarning('提示', '请先选择要移除的文件')
+            show_warning(self.root, '提示', '请先选择要移除的文件哦 (｡･ω･｡)')
             return
         
         idx = selection[0]
@@ -408,7 +642,11 @@ class S3UploaderApp:
     def clear_files(self):
         """清空文件列表"""
         if self.upload_manager.tasks:
-            result = messagebox.askyesno('确认', '确定要清空所有文件吗？')
+            result = show_question(
+                self.root,
+                '确认清空',
+                f'确定要清空所有 {len(self.upload_manager.tasks)} 个文件吗？\n此操作不可撤销！'
+            )
             if result:
                 self.upload_manager.clear_tasks()
                 self._update_file_list()
@@ -439,24 +677,28 @@ class S3UploaderApp:
                     if current not in buckets:
                         self.bucket_combobox.set(buckets[0])
                     
-                    bucket_info = f'\n可用存储桶: {", ".join(buckets[:5])}'
-                    if len(buckets) > 5:
-                        bucket_info += f'... (共{len(buckets)}个)'
-                    message += bucket_info
+                    # bucket_info = f'\n\n可用存储桶:\n' + '\n'.join(f'  • {b}' for b in buckets[:8])
+                    # if len(buckets) > 8:
+                    #     bucket_info += f'\n  ... 还有 {len(buckets)-8} 个'
+                    # message += bucket_info
                 
-                messagebox.showinfo('连接成功', message)
-                self.log_message(f'✅ {message}')
+                show_success(self.root, '连接成功', message)
+                self.log_message(f'✅ 连接测试成功')
             else:
-                messagebox.showerror('连接失败', message)
+                show_error(self.root, '连接失败', message)
                 self.log_message(f'❌ {message}')
         except Exception as e:
-            messagebox.showerror('错误', f'连接测试失败: {e}')
+            show_error(
+                self.root,
+                '连接失败',
+                f'无法连接到 S3 服务:\n\n{str(e)}\n\n请检查配置是否正确'
+            )
             self.log_message(f'❌ 连接测试失败: {e}')
     
     def start_upload(self):
         """开始上传"""
         if not self.upload_manager.get_pending_tasks():
-            messagebox.showwarning('提示', '没有待上传的文件')
+            show_warning(self.root, '提示', '还没有添加要上传的文件哦 (๑•̀ㅂ•́)و✧')
             return
         
         try:
@@ -469,10 +711,10 @@ class S3UploaderApp:
             
             self.upload_manager.start_upload(config, max_threads)
         except ValueError as e:
-            messagebox.showerror('配置错误', str(e))
+            show_error(self.root, '配置错误', f'配置参数有误:\n\n{str(e)}')
             self.log_message(f'❌ 配置错误: {e}')
         except Exception as e:
-            messagebox.showerror('错误', f'启动上传失败: {e}')
+            show_error(self.root, '启动失败', f'无法启动上传任务:\n\n{str(e)}')
             self.log_message(f'❌ 启动失败: {e}')
     
     def stop_upload(self):
@@ -509,7 +751,23 @@ class S3UploaderApp:
         """所有任务完成"""
         self.progress_bar['value'] = 100
         self.log_message('🎉 所有上传任务已完成！')
-        messagebox.showinfo('完成', '所有文件上传完成！ (∠・ω< )⌒☆')
+        
+        # 统计成功和失败的任务
+        completed = sum(1 for t in self.upload_manager.tasks if t.status == 'completed')
+        failed = sum(1 for t in self.upload_manager.tasks if t.status == 'failed')
+        
+        if failed == 0:
+            show_success(
+                self.root,
+                '上传完成',
+                f'所有文件上传完成！🎉\n\n成功: {completed} 个文件\n\n链接已自动复制到剪贴板 ฅ^•ﻌ•^ฅ'
+            )
+        else:
+            show_warning(
+                self.root,
+                '上传完成',
+                f'上传任务已完成\n\n成功: {completed} 个\n失败: {failed} 个\n\n请查看日志了解详情'
+            )
     
     # ==================== 辅助方法 ====================
     
