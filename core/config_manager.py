@@ -17,21 +17,50 @@ class ConfigManager:
         初始化配置管理器
         
         Args:
-            config_file: 配置文件名（相对于exe目录或当前目录）
+            config_file: 配置文件名
         """
-        # 获取配置文件路径（支持打包后的exe）
-        if getattr(sys, 'frozen', False):
-            # 如果是打包后的exe
-            app_dir = Path(sys.executable).parent
-        else:
-            # 如果是Python脚本
-            app_dir = Path(__file__).parent.parent
-        
-        self.config_path = app_dir / config_file
+        # 获取配置文件路径（修复打包后的路径问题）
+        self.config_path = self._get_config_path(config_file)
         self.configs: Dict[str, dict] = {}
         self.current_profile: str = 'default'
         self.load_configs()
     
+    def _get_config_path(self, config_file: str) -> Path:
+        """
+        获取配置文件路径（支持打包后的exe和开发环境）
+
+        对于打包后的exe：
+        - 如果exe在临时目录中（Nuitka onefile模式），保存到用户目录；
+        - 否则保存在exe同级目录；
+        """
+        if getattr(sys, 'frozen', False):
+            exe_path = Path(sys.executable)
+            exe_dir = exe_path.parent
+
+            # 判断是否在系统临时目录中
+            temp_dir = Path(os.environ.get("TEMP", ""))
+            if temp_dir in exe_dir.parents:
+                # Nuitka onefile模式运行临时目录 → 改为用户目录
+                user_dir = Path.home() / ".s3uploader"
+                user_dir.mkdir(parents=True, exist_ok=True)
+                return user_dir / config_file
+
+            # 否则尝试写入exe同级目录（例如便携版）
+            try:
+                test_file = exe_dir / ".write_test"
+                test_file.touch()
+                test_file.unlink()
+                return exe_dir / config_file
+            except (PermissionError, OSError):
+                # 不可写则回退到用户目录
+                user_dir = Path.home() / ".s3uploader"
+                user_dir.mkdir(parents=True, exist_ok=True)
+                return user_dir / config_file
+        else:
+            # 普通Python环境：放在项目根目录
+            app_dir = Path(__file__).resolve().parent.parent
+            return app_dir / config_file
+        
     def load_configs(self):
         """从文件加载配置"""
         if self.config_path.exists():
@@ -50,10 +79,15 @@ class ConfigManager:
         else:
             # 创建默认配置
             self.configs = {'default': self._get_default_config()}
+            # 首次运行时立即保存默认配置
+            self.save_configs()
     
     def save_configs(self):
         """保存配置到文件"""
         try:
+            # 确保父目录存在
+            self.config_path.parent.mkdir(parents=True, exist_ok=True)
+            
             data = {
                 'profiles': self.configs,
                 'current_profile': self.current_profile
@@ -63,11 +97,12 @@ class ConfigManager:
             return True
         except Exception as e:
             print(f'保存配置失败: {e}')
+            print(f'配置文件路径: {self.config_path}')
             return False
     
     def get_current_config(self) -> dict:
         """获取当前配置"""
-        return self.configs.get(self.current_profile, self._get_default_config())
+        return self.configs.get(self.current_profile, self._get_default_config()).copy()
     
     def save_current_config(self, config: dict):
         """保存当前配置"""
@@ -143,5 +178,3 @@ class ConfigManager:
             'make_public': True,
             'max_threads': 3
         }
-
-

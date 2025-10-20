@@ -81,7 +81,7 @@ class S3ClientWrapper:
             bucket_count = len(response.get('Buckets', []))
             return True, f'连接成功！发现 {bucket_count} 个存储桶 🎉'
         except Exception as e:
-            return False, f'连接失败: {str(e)} 😿'
+            return False, f'连接失败: {str(e)} '
     
     def upload_file(self, local_path: str, bucket: str, key: str, 
                    make_public: bool = False, 

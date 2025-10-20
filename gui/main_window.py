@@ -467,28 +467,53 @@ class S3UploaderApp:
         """加载当前配置到界面"""
         config = self.config_manager.get_current_config()
         
+        # 清空并插入endpoint（确保值不为None）
         self.endpoint_entry.delete(0, END)
-        self.endpoint_entry.insert(0, config.get('endpoint', ''))
+        endpoint_value = config.get('endpoint', '')
+        if endpoint_value is not None:
+            self.endpoint_entry.insert(0, str(endpoint_value))
         
-        self.bucket_combobox.set(config.get('bucket', ''))
+        # 设置bucket（下拉框使用set方法）
+        bucket_value = config.get('bucket', '')
+        if bucket_value is not None:
+            self.bucket_combobox.set(str(bucket_value))
+        else:
+            self.bucket_combobox.set('')
         
+        # 清空并插入base_url（确保值不为None）
         self.baseurl_entry.delete(0, END)
-        self.baseurl_entry.insert(0, config.get('base_url', ''))
+        baseurl_value = config.get('base_url', '')
+        if baseurl_value is not None:
+            self.baseurl_entry.insert(0, str(baseurl_value))
         
+        # 清空并插入prefix（确保值不为None）
         self.prefix_entry.delete(0, END)
-        self.prefix_entry.insert(0, config.get('prefix', ''))
+        prefix_value = config.get('prefix', '')
+        if prefix_value is not None:
+            self.prefix_entry.insert(0, str(prefix_value))
         
+        # 清空并插入access_key（确保值不为None）
         self.access_entry.delete(0, END)
-        self.access_entry.insert(0, config.get('access_key', ''))
+        access_value = config.get('access_key', '')
+        if access_value is not None:
+            self.access_entry.insert(0, str(access_value))
         
+        # 清空并插入secret_key（确保值不为None）
         self.secret_entry.delete(0, END)
-        self.secret_entry.insert(0, config.get('secret_key', ''))
+        secret_value = config.get('secret_key', '')
+        if secret_value is not None:
+            self.secret_entry.insert(0, str(secret_value))
         
-        self.public_var.pack_var.set(1 if config.get('make_public', True) else 0)
+        # 设置复选框状态
+        make_public = config.get('make_public', True)
+        self.public_var.pack_var.set(1 if make_public else 0)
         
+        # 设置线程数（确保值不为None）
         self.threads_entry.delete(0, END)
-        self.threads_entry.insert(0, str(config.get('max_threads', 3)))
-    
+        threads_value = config.get('max_threads', 3)
+        if threads_value is not None:
+            self.threads_entry.insert(0, str(threads_value))
+
     def save_config(self):
         """保存当前配置"""
         try:
