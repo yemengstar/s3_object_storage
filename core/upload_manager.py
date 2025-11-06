@@ -34,6 +34,8 @@ class UploadManager:
         self.task_queue = queue.Queue()
         self.stop_flag = threading.Event()
         self.worker_threads: List[threading.Thread] = []
+        # 记录当前批次的任务（用于统计本次上传的成功/失败数量）
+        self.current_batch_tasks: List[UploadTask] = []
         
         # 回调函数
         self.on_task_progress: Optional[Callable] = None
@@ -97,7 +99,10 @@ class UploadManager:
         pending_tasks = self.get_pending_tasks()
         if not pending_tasks:
             return
-        
+
+        # 记录当前批次的任务
+        self.current_batch_tasks = list(pending_tasks)
+
         self.total_bytes = sum(t.filesize for t in pending_tasks)
         
         # 将任务加入队列

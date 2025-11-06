@@ -777,9 +777,15 @@ class S3UploaderApp:
         self.progress_bar['value'] = 100
         self.log_message('🎉 所有上传任务已完成！')
         
-        # 统计成功和失败的任务
-        completed = sum(1 for t in self.upload_manager.tasks if t.status == 'completed')
-        failed = sum(1 for t in self.upload_manager.tasks if t.status == 'failed')
+        # 统计当前批次的成功和失败（避免累计之前批次的结果）
+        batch = getattr(self.upload_manager, 'current_batch_tasks', []) or []
+        if batch:
+            completed = sum(1 for t in batch if t.status == 'completed')
+            failed = sum(1 for t in batch if t.status == 'failed')
+        else:
+            # 兼容：若无批次信息则退化为统计全部
+            completed = sum(1 for t in self.upload_manager.tasks if t.status == 'completed')
+            failed = sum(1 for t in self.upload_manager.tasks if t.status == 'failed')
         
         if failed == 0:
             show_success(

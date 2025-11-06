@@ -3,7 +3,6 @@ S3-compatible Object Storage Uploader (Tkinter GUI)
 主程序入口
 
 Features:
-- 美观的淡蓝色猫娘主题界面
 - 支持自定义S3端点配置
 - 多文件批量上传，实时进度显示
 - 自动生成公开链接并复制到剪贴板
